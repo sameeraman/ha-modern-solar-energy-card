@@ -30,12 +30,16 @@ A sleek, modern-looking live dashboard for solar energy monitoring in Home Assis
 
 1. Install the [ha-floorplan](https://experiencelovelace.github.io/ha-floorplan/) card using HACS
 2. Download this repository and copy files to your Home Assistant configuration folder:
+    (you can choose your own folder if you like)
    ```
    /config/www/custom-lovelace/energy/
    ```
-3. Add the required sensors to your Home Assistant configuration
-4. Update `hasolardashboard.yml` with your sensor entities
-5. Add the card to your dashboard
+3. Update `hasolardashboard.yml` with your sensor entities
+4. Add the card to your lovelace dashboard as below. 
+    ```
+          - type: custom:floorplan-card
+            config: /local/custom-lovelace/energy/hasolardashboard.yml
+    ```
 
 ## ⚙️ Configuration
 
