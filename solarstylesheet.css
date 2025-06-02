@@ -1,0 +1,14 @@
+/* SVG size */
+
+#floorplan > svg {
+  max-width: 500px;
+  max-height: 500px;
+  object-fit: contain;
+  display: block;
+}
+
+/* SVG elements */
+
+svg * {
+  vector-effect: non-scaling-stroke !important;
+}

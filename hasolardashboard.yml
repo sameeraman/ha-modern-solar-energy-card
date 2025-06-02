@@ -1,0 +1,65 @@
+
+  image: /local/custom-lovelace/energy/hasolardashboard-modenhouse-v1.svg?v=1
+  stylesheet: /local/custom-lovelace/energy/solarstylesheet.css
+
+  rules:
+    - entity: sensor.power_consumption
+      state_action:
+        - service: floorplan.text_set
+          service_data: 
+            element: power_value_text
+            text: '${entity.state ? (parseFloat(entity.state) >= 1000 ? (parseFloat(entity.state) / 1000).toFixed(2) + " kW" : entity.state + " W") : "unknown"}'
+    - entity: sensor.solar_generation
+      state_action:
+        - service: floorplan.text_set
+          service_data: 
+            element: solar_value_text
+            text: '${entity.state ? (parseFloat(entity.state) >= 1000 ? (parseFloat(entity.state) / 1000).toFixed(2) + " kW" : entity.state + " W") : "unknown"}'
+    - entity: sensor.grid_power
+      state_action:
+        - service: floorplan.text_set
+          service_data: 
+            element: grid_value_text
+            text: '${entity.state ? (parseFloat(entity.state) >= 1000 ? (parseFloat(entity.state) / 1000).toFixed(2) + " kW" : entity.state + " W") : "unknown"}'
+    - name: hide_green_solar_pulse_if_not_generating_solar
+      entities:
+        - sensor.solar_generation
+      state_action:
+        action: call-service
+        service: floorplan.style_set
+        service_data:
+          elements: 
+            - solar_to_inverter
+            - solar-inverter-to-house-path
+            - solar-inverter-to-house
+          style: |
+              >
+              return (parseFloat(states['sensor.solar_generation'].state) > 4) ? `display:inline` : `display:none`;
+    - name: hide_green_grid_pulse_if_not_feeding_to_grid
+      entities:
+        - sensor.power_consumption
+        - sensor.solar_generation
+      element: pulse-from-inverter-to-grid
+      state_action:
+        action: call-service
+        service: floorplan.style_set
+        service_data:
+          style: |
+              >
+              return (parseFloat(states['sensor.power_consumption'].state) > parseFloat(states['sensor.solar_generation'].state)) ? `display:none` : `display:inline`;
+    - name: hide_orange_grid_pulse_when_not_consuming_from_grid
+      entities:
+        - sensor.power_consumption
+        - sensor.solar_generation
+      element: pulse-from-grid
+      state_action:
+        action: call-service
+        service: floorplan.style_set
+        service_data:
+          elements: 
+            - pulse-from-grid
+            - grid-inverter-to-house-path
+            - pulse-from-inverter-to-house
+          style: |
+              >
+              return (parseFloat(states['sensor.power_consumption'].state) < parseFloat(states['sensor.solar_generation'].state)) ? `display:none` : `display:inline`;
