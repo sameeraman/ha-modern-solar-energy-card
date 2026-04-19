@@ -1,5 +1,5 @@
 
-  image: /local/custom-lovelace/energy/hasolardashboard-modenhouse-v1.svg?v=1
+  image: /local/custom-lovelace/energy/hasolardashboard-modenhouse-v2.svg?v=10
   stylesheet: /local/custom-lovelace/energy/solarstylesheet.css
 
   rules:
@@ -20,7 +20,25 @@
         - service: floorplan.text_set
           service_data: 
             element: grid_value_text
-            text: '${entity.state ? (parseFloat(entity.state) >= 1000 ? (parseFloat(entity.state) / 1000).toFixed(2) + " kW" : entity.state + " W") : "unknown"}'
+            text: '${entity.state ? (Math.abs(parseFloat(entity.state)) >= 1000 ? (parseFloat(entity.state) / 1000).toFixed(2) + " kW" : entity.state + " W") : "unknown"}'
+    - entity: sensor.sigen_plant_battery_state_of_charge
+      state_action:
+        - service: floorplan.text_set
+          service_data: 
+            element: battery_soc_text
+            text: '${entity.state ? (Math.round(parseFloat(entity.state)) === 100 ? "100%" : " " + Math.round(parseFloat(entity.state)) + "%") : "unknown"}'
+    - entity: sensor.battery_power
+      state_action:
+        - service: floorplan.text_set
+          service_data: 
+            element: battery_w_text
+            text: '${entity.state ? (Math.abs(parseFloat(entity.state)) >= 1000 ? (parseFloat(entity.state) / 1000).toFixed(2) + " kW" : entity.state + " W") : "unknown"}'
+    - entity: sensor.car_charger_power
+      state_action:
+        - service: floorplan.text_set
+          service_data: 
+            element: car_charger_w_value_text
+            text: '${entity.state ? (Math.abs(parseFloat(entity.state)) >= 1000 ? (parseFloat(entity.state) / 1000).toFixed(2) + " kW" : entity.state + " W") : "unknown"}'
     - name: hide_green_solar_pulse_if_not_generating_solar
       entities:
         - sensor.solar_generation
@@ -30,15 +48,26 @@
         service_data:
           elements: 
             - solar_to_inverter
+          style: |
+              >
+              return (parseFloat(states['sensor.solar_generation'].state) > 4) ? `display:inline` : `display:none`;
+    - name: hide_green_pulse_to_house
+      entities:
+        - sensor.solar_generation
+        - sensor.battery_power
+      state_action:
+        action: call-service
+        service: floorplan.style_set
+        service_data:
+          elements: 
             - solar-inverter-to-house-path
             - solar-inverter-to-house
           style: |
               >
-              return (parseFloat(states['sensor.solar_generation'].state) > 4) ? `display:inline` : `display:none`;
-    - name: hide_green_grid_pulse_if_not_feeding_to_grid
+              return ((parseFloat(states['sensor.solar_generation'].state) > 4) || (parseFloat(states['sensor.battery_power'].state) < 10)) ? `display:inline` : `display:none`;
+    - name: show_green_grid_pulse_if_feeding_to_grid
       entities:
-        - sensor.power_consumption
-        - sensor.solar_generation
+        - sensor.grid_power
       element: pulse-from-inverter-to-grid
       state_action:
         action: call-service
@@ -46,11 +75,10 @@
         service_data:
           style: |
               >
-              return (parseFloat(states['sensor.power_consumption'].state) > parseFloat(states['sensor.solar_generation'].state)) ? `display:none` : `display:inline`;
-    - name: hide_orange_grid_pulse_when_not_consuming_from_grid
+              return (parseFloat(states['sensor.grid_power'].state) < 0) ? `display:inline` : `display:none`;
+    - name: show_orange_grid_pulse_when_consuming_from_grid
       entities:
-        - sensor.power_consumption
-        - sensor.solar_generation
+        - sensor.grid_power
       element: pulse-from-grid
       state_action:
         action: call-service
@@ -62,4 +90,80 @@
             - pulse-from-inverter-to-house
           style: |
               >
-              return (parseFloat(states['sensor.power_consumption'].state) < parseFloat(states['sensor.solar_generation'].state)) ? `display:none` : `display:inline`;
+              return (parseFloat(states['sensor.grid_power'].state) > 0) ? `display:inline` : `display:none`;
+    - name: show_green_grid_pulse_if_battery_is_charging_from_solar
+      entities:
+        - sensor.grid_power
+        - sensor.solar_generation
+        - sensor.battery_power
+      element: pulse-from-grid
+      state_action:
+        action: call-service
+        service: floorplan.style_set
+        service_data:
+          elements: 
+            - inverter-to-battery
+          style: |
+              >
+              return ((parseFloat(states['sensor.battery_power'].state) > 0) && (parseFloat(states['sensor.solar_generation'].state) > parseFloat(states['sensor.battery_power'].state))) ? `display:inline` : `display:none`;
+    - name: show_green_grid_pulse_if_battery_is_discharging_to_house
+      entities:
+        - sensor.grid_power
+        - sensor.solar_generation
+        - sensor.battery_power
+      element: pulse-from-grid
+      state_action:
+        action: call-service
+        service: floorplan.style_set
+        service_data:
+          elements: 
+            - battery-to-inverter
+          style: |
+              >
+              return ((parseFloat(states['sensor.battery_power'].state) < 0)) ? `display:inline` : `display:none`;
+    - name: show_green_grid_pulse_if_car_charger_is_active
+      entities:
+        - sensor.car_charger_power
+      element: pulse-from-grid
+      state_action:
+        action: call-service
+        service: floorplan.style_set
+        service_data:
+          elements: 
+            - inverter-to-charger
+          style: |
+              >
+              return ((parseFloat(states['sensor.car_charger_power'].state) > 10)) ? `display:inline` : `display:none`;
+    - name: update_battery_status_bar
+      entity: sensor.sigen_plant_battery_state_of_charge
+      state_action:
+        - service: floorplan.style_set
+          service_data:
+            element: battery_soc_bar
+            style: |
+              >
+              const percentage = parseFloat(states['sensor.sigen_plant_battery_state_of_charge'].state);
+              const normalizedValue = percentage / 100;
+              const offset = 100 * (1 - normalizedValue);
+              
+              let strokeColor;
+              let strokeColorBright;
+              
+              if (percentage >= 80) {
+                strokeColor = '#16F912';
+                strokeColorBright = '#16F912';
+              } else if (percentage >= 60) {
+                strokeColor = '#6cb33f';
+                strokeColorBright = '#80FF95';
+              } else if (percentage >= 40) {
+                strokeColor = '#ffc107';
+                strokeColorBright = '#ffeb3b';
+              } else if (percentage >= 20) {
+                strokeColor = '#fd7e14';
+                strokeColorBright = '#ff9800';
+              } else {
+                strokeColor = '#dc3545';
+                strokeColorBright = '#f44336';
+              }
+              
+              return `stroke-dashoffset: ${offset}; stroke: ${strokeColorBright}; fill: ${strokeColor};`;
